@@ -1,0 +1,25 @@
+{
+  "name": "sovereign-comms",
+  "version": "0.1.0",
+  "description": "Reference implementation of the GhostBox Protocol and Companion Permissions Layer",
+  "license": "AGPL-3.0-or-later",
+  "author": "Cory A. Ottenwess",
+  "type": "module",
+  "main": "src/identity.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No test runner wired yet. See test-vectors/.\" && exit 0"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.4.0",
+    "@noble/hashes": "^1.4.0",
+    "hash-wasm": "^4.11.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "privacy", "cryptography", "dead-drop", "zero-identity",
+    "data-sovereignty", "argon2id", "metadata-resistance", "ghostbox"
+  ]
+}
