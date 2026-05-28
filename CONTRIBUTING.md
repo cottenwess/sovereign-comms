@@ -23,13 +23,13 @@ By contributing, you agree your contributions are licensed under the project's [
 
 ## Security issues
 
-**Do not open a public issue or PR for a vulnerability.** Email the maintainer privately (see repository profile / book site) with:
+**Do not open a public issue or PR for a vulnerability.** Use GitHub's private vulnerability reporting: go to the [**Security tab**](../../security) and click **Report a vulnerability**. Include:
 
 - a description of the flaw,
 - which spec section or file it affects,
 - a proof-of-concept if you have one.
 
-Give a reasonable window for a fix before public disclosure. Credit will be given unless you ask otherwise.
+The report stays private to the maintainers until a fix is ready. Give a reasonable window for a fix before public disclosure. Credit will be given unless you ask otherwise. See [`SECURITY.md`](./SECURITY.md) for full details.
 
 ## Workflow
 

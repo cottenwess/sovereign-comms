@@ -7,15 +7,19 @@
 This project is privacy and communication infrastructure. A publicly disclosed
 flaw can expose real users before a fix exists. Report privately.
 
-**How:** email the maintainer (contact on the repository profile / book site) with:
+**How:** use GitHub's private vulnerability reporting. Go to the
+[**Security tab**](../../security) of this repository and click
+**Report a vulnerability**. This opens a private report visible only to the
+maintainers — not a public issue. Please include:
 
 - a description of the vulnerability,
 - the spec section or file affected,
 - a proof-of-concept if you have one,
 - the impact as you understand it.
 
-Please allow a reasonable window for a fix before public disclosure. We will
-acknowledge receipt, keep you updated, and credit you in the disclosure unless
+The report and any follow-up discussion stay private on GitHub until a fix is
+ready and an advisory is published. Please allow a reasonable window for a fix
+before public disclosure. You will be credited in the published advisory unless
 you prefer to remain anonymous.
 
 ## Scope
