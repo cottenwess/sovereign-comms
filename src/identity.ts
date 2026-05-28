@@ -174,6 +174,9 @@ export async function deriveIdentity(
 ): Promise<Identity> {
   assertEntropyFloor(factors);
   const params = ARGON_PARAMS[paramVersion];
+  if (!params) {
+    throw new Error(`Unknown Argon2id parameter version: ${paramVersion}`);
+  }
   const composite = canonicalize(factors);
 
   const saltLocator = hkdfSalt(composite, "ghostbox/v1/locator");
