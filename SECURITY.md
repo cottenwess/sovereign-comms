@@ -39,3 +39,47 @@ The reference implementations are readable demonstrations of correct
 construction, not hardened libraries. They have not been independently audited.
 Do not deploy them as-is. An independent audit is a prerequisite this project
 has not yet met, and that fact is stated plainly rather than glossed.
+
+## Known limitations of the reference implementations
+
+These are documented constraints, not vulnerabilities. They are stated here so a
+consuming client handles them rather than assuming the Spirit Layer does.
+
+### Secret erasure is best-effort, not guaranteed
+
+The reference code zeros the composite (and, in TypeScript, the per-composite
+salts) in a `finally` block on every exit path. That is the most a managed
+runtime can offer, and it is not erasure.
+
+- Any **"know"** factor that existed as a `string` (TypeScript) or `str`
+  (Python) before it reached the layer **cannot be wiped by anyone**, because
+  strings are immutable and live in the heap until garbage collection chooses to
+  reclaim them. The same applies to Python `bytes`; only `bytearray` and
+  `Uint8Array` can be zeroed in place.
+- JavaScript engines (V8) and the Python runtime copy and intern buffers during
+  normal operation, so traces of unhashed factors may survive in RAM longer than
+  the explicit wipe suggests.
+
+Mitigation: keep the secret's lifetime as short as possible and, for
+high-security callers, accept pre-encoded bytes at the API boundary so the layer
+never holds the immutable string. A deployment that requires a genuine erasure
+guarantee should use a native-language client with explicit memory management.
+The reference code's `fill(0)` is harm reduction, not a guarantee.
+
+### Entropy estimation raises the floor; it does not make it honest
+
+The 128-bit entropy floor (SPEC §3.2) is enforced with a measured estimate, not
+a caller-supplied number: `"know"` factors are scored with
+[zxcvbn](https://github.com/zxcvbn-ts/zxcvbn), and other factor classes declare
+an entropy value that is capped by class. Two honest caveats:
+
+- **zxcvbn is a heuristic and English-biased.** A structured-but-guessable
+  passphrase, or one built from non-English patterns the dictionaries don't
+  cover, will be over-rated. The gate is a meaningful floor, not a proof of
+  unguessability.
+- **A biometric is not a secret.** The `"are"` factor class is capped low and
+  must never be load-bearing: biometric material is low-entropy and, unlike a
+  passphrase, cannot be revoked or rotated after compromise.
+
+A client should still run its own estimator at onboarding and refuse weak
+configurations before they ever reach derivation.
