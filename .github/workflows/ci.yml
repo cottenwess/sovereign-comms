@@ -33,5 +33,5 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: pip install argon2-cffi cryptography
-      - run: python test-vectors/verify_vectors.py
+- run: pip install argon2-cffi cryptography zxcvbn
+- run: python test-vectors/verify_vectors.py
