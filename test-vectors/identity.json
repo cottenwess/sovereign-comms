@@ -1,55 +1,55 @@
 {
-  "spec_section": "3",
-  "argon_param_version": "argon2id-v1",
-  "_comment": "Frozen vectors. Both implementations (src/identity.ts canonical, reference/identity.py) MUST reproduce every 'expected' value byte-for-byte. Verified cross-language on generation. Regenerate ONLY with a reviewed run; changing these silently breaks every derived identity.",
-  "vectors": [
-    {
-      "name": "passphrase-only-book-demo",
-      "note": "Weakest valid config. Book Appendix B words. Demo only; not a recommended key composition.",
-      "param_version": "argon2id-v1",
-      "factors": [
-        { "class": "know", "text": "Nebula" },
-        { "class": "know", "text": "77" },
-        { "class": "know", "text": "Correct" },
-        { "class": "know", "text": "Horse" }
-      ],
-      "expected": {
-        "locator_hash_hex": "e44de3c03ea7df5ef9cfbdf46d0a9a9a",
-        "signing_public_hex": "5881f850e3b6454e9100496e09c56adaa42dfe11056f7193739a6f35c2bbf903",
-        "encryption_public_hex": "551226f23f753d91de8cd12d831997d11547bc6b0de01f15276ca9af4d062c51"
-      }
-    },
-    {
-      "name": "ordering-sensitivity",
-      "note": "Same factors as book-demo, reordered. MUST produce a DIFFERENT identity (order is part of the secret, SPEC 3.6). Verified distinct from passphrase-only-book-demo.",
-      "param_version": "argon2id-v1",
-      "factors": [
-        { "class": "know", "text": "Horse" },
-        { "class": "know", "text": "Correct" },
-        { "class": "know", "text": "77" },
-        { "class": "know", "text": "Nebula" }
-      ],
-      "expected": {
-        "locator_hash_hex": "9463cea6a4249c044db78a0e6b55693d",
-        "signing_public_hex": "cf916ec6ddba13c6ef783fe96271c1283f2562a528e9ad430e83b6e3af48e897",
-        "encryption_public_hex": "b63fbbdd9c31d93aedcc9ce3dcaea304a4b56c672cbe30d69912444968e01244"
-      },
-      "must_differ_from": "passphrase-only-book-demo"
-    },
-    {
-      "name": "below-entropy-floor",
-      "note": "Total estimated entropy below 128 bits. Derivation MUST throw (SPEC 3.2).",
-      "param_version": "argon2id-v1",
-      "factors": [
-        { "class": "know", "text": "a", "entropy_bits": 4 },
-        { "class": "know", "text": "b", "entropy_bits": 4 },
-        { "class": "know", "text": "c", "entropy_bits": 4 },
-        { "class": "know", "text": "d", "entropy_bits": 4 }
-      ],
-      "expected": {
-        "throws": true,
-        "error_contains": "entropy"
-      }
-    }
-  ]
+    "spec_section": "3",
+    "argon_param_version": "argon2id-v1",
+    "_comment": "Frozen vectors. Both implementations (src/identity.ts canonical, reference/identity.py) MUST reproduce every 'expected' value byte-for-byte. Generated from the corrected implementations where Python HKDF matches TypeScript (RFC 5869 Extract+Expand). Entropy values for 'know' factors are measured by zxcvbn at derivation time; the optional 'entropy_bits' field in factor specs is documentation only and is NOT passed to text_factor. Regenerate ONLY with a reviewed run; changing these silently breaks every derived identity.",
+    "vectors": [
+        {
+            "name": "strong-passphrase",
+            "note": "Four strong passphrase factors, each under 80 bits individually, collectively clearing the 128-bit floor with diversity rule satisfied. Canonical derivation vector.",
+            "param_version": "argon2id-v1",
+            "factors": [
+                { "class": "know", "text": "correct-horse-battery-staple" },
+                { "class": "know", "text": "phosphorescent-wavelength" },
+                { "class": "know", "text": "oblique-manifold-quartz-99" },
+                { "class": "know", "text": "labyrinthine-telescope-echo" }
+            ],
+            "expected": {
+                "locator_hash_hex": "494bb6f0d198e9e7169c411a2c067380",
+                "signing_public_hex": "519617d2eec6877a6a1b69dddcfea0a5dbd05ad898b47ddf15a0b628922d9d52",
+                "encryption_public_hex": "39b044e3584c0d0453f56a6c9c7c82e8944f4bffecb981fdb520da8d57bc8a54"
+            }
+        },
+        {
+            "name": "ordering-sensitivity",
+            "note": "Same factors as strong-passphrase, reordered. MUST produce a DIFFERENT identity (order is part of the secret, SPEC 3.6). Verified distinct from strong-passphrase.",
+            "param_version": "argon2id-v1",
+            "factors": [
+                { "class": "know", "text": "labyrinthine-telescope-echo" },
+                { "class": "know", "text": "oblique-manifold-quartz-99" },
+                { "class": "know", "text": "phosphorescent-wavelength" },
+                { "class": "know", "text": "correct-horse-battery-staple" }
+            ],
+            "expected": {
+                "locator_hash_hex": "280ca69fbb61575b1c61fd771c850e14",
+                "signing_public_hex": "c2ac26257b815c79cf9bfe9dd5db6945b27087e05cba76c95cf70948a62aa1c4",
+                "encryption_public_hex": "12928ced8445d8d38b73a448e46034bbe0f67104e0ac43459c2ffe630cda1844"
+            },
+            "must_differ_from": "strong-passphrase"
+        },
+        {
+            "name": "below-entropy-floor",
+            "note": "Single-character factors score near zero bits each under zxcvbn measurement. Derivation MUST throw before reaching Argon2id (SPEC 3.2).",
+            "param_version": "argon2id-v1",
+            "factors": [
+                { "class": "know", "text": "a" },
+                { "class": "know", "text": "b" },
+                { "class": "know", "text": "c" },
+                { "class": "know", "text": "d" }
+            ],
+            "expected": {
+                "throws": true,
+                "error_contains": "entropy"
+            }
+        }
+    ]
 }
