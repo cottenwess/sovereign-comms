@@ -35,10 +35,11 @@ A conformant implementation MUST satisfy every MUST in §2–§6. Everything in 
 
 ### 0.4 Divergences from the published book text
 
-The book's Appendix B contains illustrative reference code. This spec corrects two things for production use and flags them so the difference is intentional, not a contradiction:
+The book's Appendix B contains illustrative reference code. This spec corrects three things for production use and flags them so the difference is intentional, not a contradiction:
 
 - **Salt derivation.** Appendix B's example uses static salts (`b'static_salt_for_locator'`). That is a documentation simplification. This spec REQUIRES salts bound to the Quad-Key composite (§3.3). Static salts make identities collide across users and enable precomputed-table attacks.
 - **Argon2id parameters.** The book quotes one parameter set. This spec defines a versioned parameter ladder (§3.4) so the cost can rise over time without breaking existing identities.
+- **HKDF construction.** An earlier version of §3.3 and §6.5 illustrated the per-composite salt using a single `HMAC(label, composite)` call, which is HKDF-Extract only — not full RFC 5869 HKDF. The salt MUST be derived with Extract **then** Expand (§3.3). The reference implementation (§6.5) has been corrected accordingly, and the cross-language test vectors (§6.5) were regenerated from the corrected code. Where an older local copy of this spec shows the single-HMAC form, this version governs.
 
 Where this document and the book disagree, **this document governs for implementers.**
 
@@ -117,7 +118,10 @@ Factors MAY be drawn from any combination of:
 **Requirements:**
 
 - An implementation MUST accept a variable composite — different users will use different factor combinations.
-- The composite MUST reach a minimum entropy floor of **128 bits** before derivation proceeds. Implementations MUST estimate and enforce this at key-creation time and MUST refuse to derive below it.
+- The composite MUST reach a minimum entropy floor of **128 bits** before derivation proceeds. Implementations MUST measure and enforce this before calling the KDF; entropy MUST NOT be accepted from the caller as a declared value. Conformant enforcement requires all three of the following:
+  - **`know` factors**: entropy MUST be measured with an automated estimator (e.g., zxcvbn) applied to the NFC-normalized text. The caller's claimed bit count is ignored.
+  - **Per-class caps**: each factor's contribution is bounded regardless of raw estimate — `know` ≤ 80 bits, `are` ≤ 24 bits, `have` ≤ 64 bits, `who` ≤ 64 bits. The `are` cap is hard-low because biometric factors are non-revocable; a leaked biometric hash cannot be changed, so it MUST NOT be load-bearing.
+  - **Diversity rule**: no single factor MAY contribute more than half the total measured entropy. This prevents one strong secret from carrying the key alone and forces genuine multi-factor composition.
 - The specific factor composition is itself secret. An implementation MUST NOT emit, log, or transmit which factor classes a given identity used. The unpredictability of the composition is a security property (§8).
 - Factor inputs MUST be canonicalized before combination (defined byte encoding, defined ordering, defined separator) so the same logical Quad-Key always produces the same composite. Canonicalization rules are in §3.6.
 
@@ -125,21 +129,24 @@ Factors MAY be drawn from any combination of:
 
 > ⚠️ A passphrase-only Quad-Key is the weakest valid configuration and SHOULD be discouraged in onboarding UX in favor of at least one non-knowledge factor.
 
-### 3.3 Salt (normative — diverges from book)
+### 3.3 Salt (normative — diverges from book and from earlier drafts of this spec)
 
 The derivation MUST use a salt that is:
 
 1. **Bound to the Quad-Key composite**, so two users who happen to choose identical factors do not collide; AND
 2. **Deterministic from the composite**, so the same user re-derives the same identity on any device with no stored state.
 
-The RECOMMENDED construction is a domain-separated hash of the canonicalized composite:
+The REQUIRED construction is **full RFC 5869 HKDF-SHA-256 (Extract then Expand)**, with the composite as the input keying material, an empty salt (filled with 32 zero bytes per RFC 5869 §2.2), and the domain-separation label as the `info` input to Expand:
 
 ```
-salt_locator = HKDF-Extract(salt="ghostbox/v1/locator", IKM=composite)
-salt_access  = HKDF-Extract(salt="ghostbox/v1/access",  IKM=composite)
+PRK          = HKDF-Extract( salt=0x00×32,               IKM=composite )
+salt_locator = HKDF-Expand(  PRK, info="ghostbox/v1/locator", L=32 )
+salt_access  = HKDF-Expand(  PRK, info="ghostbox/v1/access",  L=32 )
 ```
 
-Implementations MUST NOT use a single static salt shared across users. (This is the correction to the book's illustrative code.)
+The same PRK is reused for both Expand calls because the IKM (composite) is identical; the distinct `info` labels provide the domain separation. Both outputs are 32-byte per-composite salts fed into Argon2id.
+
+Implementations MUST NOT use a single static salt shared across users. Implementations MUST NOT substitute a bare `HMAC(label, composite)` for HKDF: that construction is Extract-only, omits Expand, and produces different output than the above — cross-implementation parity is lost. (This was the error in an earlier illustrative snippet; the cross-language test vectors in §6.5 were regenerated after the correction.)
 
 ### 3.4 Derivation function and parameter ladder
 
@@ -371,42 +378,75 @@ The server processes an unrelated deposit and drain. It MUST be unable to link t
 
 ### 6.5 Reference: identity derivation (corrected)
 
-> This replaces the book's illustrative snippet. Differences: per-composite salts via HKDF (§3.3), variable composite input (not fixed 4 words), and keypair derivation from the Access Token seed.
+> This replaces the book's illustrative snippet and corrects an earlier version of this section. Changes from the previous version of this spec: (1) `hkdf_salt` now performs full RFC 5869 HKDF (Extract then Expand) matching §3.3, not a bare HMAC-Extract; (2) entropy is measured with zxcvbn, not declared by the caller; (3) per-class caps and the diversity rule are enforced (§3.2); (4) the composite is zeroed in a `finally` block; (5) keypair derivation from the Access Token seed is shown. The cross-language test vectors were regenerated from this corrected construction.
 
 ```python
-import hashlib, hmac
+import math, unicodedata
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+from cryptography.hazmat.primitives.hashes import SHA256
+from zxcvbn import zxcvbn as _zxcvbn
 
-UNIT_SEP = b"\x1f"
+UNIT_SEP    = b"\x1f"
+ENTROPY_MIN = 128   # bits
+CLASS_CAP   = {"know": 80, "are": 24, "have": 64, "who": 64}
 
-def canonicalize(factors: list[bytes]) -> bytes:
+def _hkdf(ikm: bytes, info: bytes, length: int = 32) -> bytes:
+    # Full RFC 5869 HKDF-SHA256, salt=None -> 0x00*32 per spec.
+    # Extract: PRK = HMAC-SHA256(key=0x00*32, msg=ikm)
+    # Expand:  OKM = HMAC-SHA256(key=PRK, msg=info || 0x01)[:length]
+    return HKDF(SHA256(), length, salt=None, info=info).derive(ikm)
+
+def assert_entropy_floor(factors: list) -> None:
+    bits = []
+    for f in factors:
+        if f["class"] == "know":
+            raw = math.log2(max(_zxcvbn(f["text"])["guesses"], 2))
+        else:
+            raw = f["declared_bits"]  # hashed/token factors declare; caller is responsible
+        bits.append(min(raw, CLASS_CAP[f["class"]]))
+    total = sum(bits)
+    if total < ENTROPY_MIN:
+        raise ValueError(f"entropy {total:.1f} bits < required {ENTROPY_MIN}")
+    if max(bits) > total / 2:
+        raise ValueError("no single factor may supply more than half the entropy floor")
+
+def canonicalize(factors: list) -> bytearray:
     # factors already reduced to bytes by caller:
-    #   text -> NFC-normalized UTF-8; biometric/doc -> fixed-length hash
+    #   "know" -> NFC-normalized UTF-8; others -> fixed-length hash digest
     # order is user-fixed and part of the secret
-    return UNIT_SEP.join(factors)
+    parts = [unicodedata.normalize("NFC", f["text"]).encode()
+             if f["class"] == "know" else f["digest"]
+             for f in factors]
+    buf = bytearray()
+    for i, p in enumerate(parts):
+        buf += p
+        if i < len(parts) - 1:
+            buf += bytearray([0x1F])
+    return buf  # mutable bytearray so it can be zeroed; caller MUST zero after use
 
-def hkdf_salt(composite: bytes, label: bytes) -> bytes:
-    # HKDF-Extract (SHA-256): salt=label acts as domain separator
-    return hmac.new(label, composite, hashlib.sha256).digest()
+def derive_identity(factors: list, argon_params: dict):
+    assert_entropy_floor(factors)       # raises if below floor or diversity rule fails
+    composite = canonicalize(factors)   # bytearray; zeroed in finally
+    try:
+        salt_loc = _hkdf(bytes(composite), b"ghostbox/v1/locator")
+        salt_acc = _hkdf(bytes(composite), b"ghostbox/v1/access")
 
-def derive_identity(factors: list[bytes], argon_params: dict):
-    composite = canonicalize(factors)
-    # entropy floor MUST be enforced by caller before this point (>=128 bits)
+        locator     = Argon2id(salt=salt_loc, length=16, **argon_params).derive(bytes(composite))
+        access_seed = Argon2id(salt=salt_acc, length=32, **argon_params).derive(bytes(composite))
 
-    salt_loc = hkdf_salt(composite, b"ghostbox/v1/locator")
-    salt_acc = hkdf_salt(composite, b"ghostbox/v1/access")
+        sign_seed = _hkdf(access_seed, b"ghostbox/v1/sign")  # seeds Ed25519 signing keypair
+        enc_seed  = _hkdf(access_seed, b"ghostbox/v1/enc")   # seeds X25519 encryption keypair
 
-    locator = Argon2id(salt=salt_loc, length=16, **argon_params).derive(composite)
-    access_seed = Argon2id(salt=salt_acc, length=32, **argon_params).derive(composite)
-
-    # access_seed then seeds Ed25519 (signing) + X25519 (encryption) keypairs
-    return locator.hex(), access_seed  # access_seed stays in RAM only
+        return locator.hex(), access_seed   # access_seed stays in RAM only
+    finally:
+        composite[:] = b"\x00" * len(composite)   # best-effort wipe; see SECURITY.md
 
 # argon2id-v1
 PARAMS_V1 = dict(iterations=4, lanes=4, memory_cost=65536)
 ```
 
-The memory-hard parameters keep brute force expensive even for well-resourced adversaries while holding derivation under ~2 seconds on a normal device.
+The memory-hard parameters keep brute force expensive even for well-resourced adversaries while holding derivation under ~2 seconds on a normal device. The `finally` wipe is best-effort only: text factors that existed as strings before reaching this layer cannot be wiped from managed-runtime heap memory. See SECURITY.md for a full treatment of the erasure ceiling.
 
 ---
 
