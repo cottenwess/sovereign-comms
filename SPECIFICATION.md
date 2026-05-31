@@ -39,7 +39,7 @@ The book's Appendix B contains illustrative reference code. This spec corrects t
 
 - **Salt derivation.** Appendix B's example uses static salts (`b'static_salt_for_locator'`). That is a documentation simplification. This spec REQUIRES salts bound to the Quad-Key composite (§3.3). Static salts make identities collide across users and enable precomputed-table attacks.
 - **Argon2id parameters.** The book quotes one parameter set. This spec defines a versioned parameter ladder (§3.4) so the cost can rise over time without breaking existing identities.
-- **HKDF construction.** An earlier version of §3.3 and §6.5 illustrated the per-composite salt using a single `HMAC(label, composite)` call, which is HKDF-Extract only — not full RFC 5869 HKDF. The salt MUST be derived with Extract **then** Expand (§3.3). The reference implementation (§6.5) has been corrected accordingly, and the cross-language test vectors (§6.5) were regenerated from the corrected code. Where an older local copy of this spec shows the single-HMAC form, this version governs.
+- **HKDF construction.** An earlier version of §3.3 and §6.6 illustrated the per-composite salt using a single `HMAC(label, composite)` call, which is HKDF-Extract only — not full RFC 5869 HKDF. The salt MUST be derived with Extract **then** Expand (§3.3). The reference implementation (§6.6) has been corrected accordingly, and the cross-language test vectors (§6.6) were regenerated from the corrected code. Where an older local copy of this spec shows the single-HMAC form, this version governs.
 
 Where this document and the book disagree, **this document governs for implementers.**
 
@@ -146,7 +146,7 @@ salt_access  = HKDF-Expand(  PRK, info="ghostbox/v1/access",  L=32 )
 
 The same PRK is reused for both Expand calls because the IKM (composite) is identical; the distinct `info` labels provide the domain separation. Both outputs are 32-byte per-composite salts fed into Argon2id.
 
-Implementations MUST NOT use a single static salt shared across users. Implementations MUST NOT substitute a bare `HMAC(label, composite)` for HKDF: that construction is Extract-only, omits Expand, and produces different output than the above — cross-implementation parity is lost. (This was the error in an earlier illustrative snippet; the cross-language test vectors in §6.5 were regenerated after the correction.)
+Implementations MUST NOT use a single static salt shared across users. Implementations MUST NOT substitute a bare `HMAC(label, composite)` for HKDF: that construction is Extract-only, omits Expand, and produces different output than the above — cross-implementation parity is lost. (This was the error in an earlier illustrative snippet; the cross-language test vectors in §6.6 were regenerated after the correction.)
 
 ### 3.4 Derivation function and parameter ladder
 
@@ -258,7 +258,7 @@ Requirements:
 
 ### 4.5 What the Specter Layer also carries
 
-The dead-drop is not messaging-only. Any exchange that needs to move *something* between two parties without disclosing identity to each other or to the infrastructure operates here: message blobs, asset transfers, the encrypted Tier-2 address handoff during a handshake (§5.6), and read-receipt tokens (§6.4).
+The dead-drop is not messaging-only. Any exchange that needs to move *something* between two parties without disclosing identity to each other or to the infrastructure operates here: message blobs, asset transfers, the encrypted Tier-2 address handoff during a handshake (§5.6), and read-receipt tokens (§6.5).
 
 ---
 
@@ -274,7 +274,7 @@ It has three structural components and four discovery modes, all governed by one
 
 **Public Mask** — a voluntary alias listed in a distributed hash table (DHT), pointing to the user's Lobby. OPTIONAL per user. A user with no Public Mask is undiscoverable except by proximity (§5.4).
 
-**Lobby** — a filtering Drop-Box for inbound connection requests. It is a Tier-1 address: deliberately disposable and rotatable. Flooding the Lobby costs the attacker nothing but reveals nothing and reaches nothing past the filter. The Lobby is the spam firewall that replaces sender-identification.
+**Lobby** — a filtering Drop-Box for inbound connection requests. It is a Tier-1 address: deliberately disposable and rotatable. Flooding the Lobby reveals nothing and reaches nothing past the filter. It does, however, impose a client-side cost: junk requests must be drained and decrypted by the recipient before the filter can discard them. A future revision will require an anonymous rate-limiting token on Lobby PUTs to make flooding asymmetrically expensive without reintroducing sender identity (see the design note in §8.3). The Lobby is the spam firewall that replaces sender-identification.
 
 **Ghost Channel** — a unique, private, per-relationship communication address (Tier-2). Generated once a connection is accepted; thereafter the Lobby is no longer involved for that relationship. Each relationship gets its own Ghost Channel, so revoking one (§5.8) leaks nothing about the others.
 
@@ -351,19 +351,91 @@ Requirements:
 |---|---|---|
 | Key derivation | Argon2id (versioned, §3.4) | MUST |
 | Salt expansion | HKDF-SHA-256 | MUST |
-| Message encryption | Double Ratchet over X25519 + AEAD (XChaCha20-Poly1305 RECOMMENDED) | MUST |
+| Message encryption | Double Ratchet over X25519 + AEAD (XChaCha20-Poly1305 RECOMMENDED), wrapped in the committing transform of §6.1.1 | MUST |
+| Key commitment | UtC committing transform binding key, nonce, and AD (§6.1.1) | MUST |
 | Signatures (challenge-response) | Ed25519 | RECOMMENDED |
 | Hashing | SHA-256 / BLAKE2 | MUST |
 
+### 6.1.1 Key commitment (committing AEAD)
+
+The AEAD ciphers above (XChaCha20-Poly1305, AES-GCM) provide confidentiality and integrity but NOT *key commitment*: an attacker who controls key material can construct a single ciphertext and tag that decrypt validly under two different keys to two different plaintexts. This is the "Invisible Salamanders" / partitioning-oracle attack, and it bites GhostBox specifically in Mediated Introduction (§5.5), where one party hands an encrypted payload to two recipients and could otherwise present different content to each. Every AEAD operation in the protocol therefore MUST be wrapped in a committing transform.
+
+GhostBox uses the **UtC (UNAE-then-Commit)** transform (Bellare–Hoang), which yields CMT-4 commitment — binding the key, the nonce, and the associated data. For a message with ratchet message-key `K`, nonce `N`, associated data `AD`, and plaintext `P`:
+
+```
+subkey    = HKDF(SHA-256, IKM=K, info="ghostbox/v1/aead-subkey" || N,           L=32)
+commit    = HKDF(SHA-256, IKM=K, info="ghostbox/v1/key-commit"  || N || H(AD),  L=32)
+(ct, tag) = AEAD-Encrypt(key=subkey, nonce=N, plaintext=P, ad=AD)
+envelope  = commit || N || ct || tag
+```
+
+- `H(AD)` is SHA-256 of the associated data, binding it into the commitment so AD cannot be swapped under a colliding key.
+- The underlying AEAD is keyed by `subkey`, **never** by `K` directly. `K` is used only to derive the committing pair `(subkey, commit)`.
+
+On receipt the client MUST, in order:
+
+1. Recompute `commit'` from its own `K`, the received `N`, and `H(AD)`.
+2. Compare `commit'` against the received `commit` in **constant time**.
+3. REJECT the message **before** invoking AEAD decryption if they differ.
+4. Only on match, derive `subkey` and decrypt.
+
+The cost is one extra HKDF call and 32 bytes per message. This committing envelope is the canonical GhostBox message envelope: it is what every Specter-layer PUT deposits (§4.1), including the Receipt Token envelope (§6.5).
+
 ### 6.2 Forward secrecy
 
-Message encryption MUST use the **Double Ratchet Algorithm** (the construction underlying Signal). Compromise of the Quad-Key in the future MUST NOT decrypt past messages encrypted under prior session keys.
+Message encryption MUST use the **Double Ratchet Algorithm** (the construction underlying Signal). Compromise of the Quad-Key in the future MUST NOT decrypt past messages encrypted under prior session keys. The Double Ratchet is inherently stateful; §6.4 specifies how that state survives the wipe-on-exit requirement of §6.3 without local persistence and without making the server anything but a passive store.
 
 ### 6.3 Device agnosticism
 
-Because possession is identity (**P1**), a user MUST be able to access their queue from any device: install client → enter Quad-Key → derive in RAM → access. On exit, **all local data MUST be wiped.** No device-specific credential and no server-side recovery process may exist.
+Because possession is identity (**P1**), a user MUST be able to access their queue from any device: install client → enter Quad-Key → derive in RAM → access. On exit, **all local data MUST be wiped.** No device-specific credential may exist, and no server-side process may recover a user's identity or content *without the Quad-Key*. Encrypted session state MAY be delegated to the network under a key only the Quad-Key holder can derive (§6.4); this is session continuity, not account recovery, because without the Quad-Key the delegated state is undecryptable noise.
 
-### 6.4 Zero-knowledge read receipts
+### 6.4 Asynchronous state synchronization
+
+The Double Ratchet (§6.2) is stateful: decrypting a message requires the current root key, the relevant chain key, the ratchet counters, the private half of the live ephemeral DH key, and any skipped-message keys. Wipe-on-exit (§6.3) destroys all of it. A returning user re-derives their identity from the Quad-Key but holds no ratchet state, and so cannot decrypt anything sent since the last session. The protocol resolves this paradox without local persistence and without making the server active, by delegating *encrypted* state to the network.
+
+**Storage location.** State is stored at a dedicated address, derived from the Access Token seed and distinct from the message Locator Hash, so that knowing a user's public Locator Hash reveals neither that a state blob exists nor when it changes:
+
+```
+sync_locator = HKDF(access_seed, "ghostbox/v1/sync-locator", L=16)
+```
+
+(HKDF, not a third Argon2id pass — the address inherits its unguessability from `access_seed`, which is already Argon2id output.)
+
+**Forward-ratcheted backup key.** State MUST NOT be encrypted under a static key. A static backup key means one future compromise of that key decrypts every state blob ever written, which destroys the forward secrecy the ratchet exists to provide. The backup key is instead ratcheted forward once per successful sync:
+
+```
+sync_key_0  = HKDF(access_seed,      "ghostbox/v1/state-sync", L=32)   # first session
+sync_key_n  = HKDF(sync_key_{n-1},   "ghostbox/v1/state-sync", L=32)   # advance each sync
+```
+
+After advancing, the client MUST forget `sync_key_{n-1}`. A blob written under `sync_key_{n-1}` is then undecryptable to a holder of `sync_key_n` alone, because HKDF is one-way: a later key never yields an earlier one. The server stays passive throughout — it only stores and serves opaque bytes.
+
+**Session protocol.**
+
+```
+On exit:
+  1. Serialize ratchet state (root key, chain keys, counters, live ephemeral
+     private key, skipped-message keys) for every active Ghost Channel.
+  2. Advance: sync_key_n = HKDF(sync_key_{n-1}, "ghostbox/v1/state-sync"); forget the old key.
+  3. envelope = committing-AEAD(key=sync_key_n, plaintext=serialized_state)   # §6.1.1
+  4. PUT envelope to sync_locator. Wipe all local state.
+
+On entry (BEFORE polling any message address):
+  1. Derive identity + sync_locator from the Quad-Key.
+  2. Drain sync_locator. If empty -> no prior state; fall back to a fresh X3DH
+     handshake per relationship.
+  3. If present, walk sync_key forward from sync_key_0 until a blob decrypts,
+     restore ratchet state, THEN begin polling message addresses.
+```
+
+Two requirements protect correctness:
+
+- A client MUST drain and restore `sync_locator` **before** polling any message address in a session, or it will derive message keys against stale state.
+- The index `n` is stored nowhere, so the client re-derives it by ratcheting `sync_key` forward from `sync_key_0` until a blob decrypts. The server MAY store a monotone counter beside the blob as a walk-bounding hint; that hint is trusted for nothing else.
+
+**What this buys, stated plainly.** It reconciles the Double Ratchet with statelessness, and it ensures the backup channel is not a single static skeleton key: a `sync_key` that leaks *without* the Access Token (e.g. one session's key recovered from RAM) cannot decrypt other sessions' state. It does NOT provide post-compromise security against an adversary holding the live Quad-Key — that key is a permanent, deterministically re-derived secret by design (§3), so an attacker who has it can re-derive `sync_key` forward and follow along. PCS against full Quad-Key capture is a property of the identity layer, not of this mechanism; a deployment that needs it must add a key-rotation story at the Spirit Layer.
+
+### 6.5 Zero-knowledge read receipts
 
 Read confirmation MUST NOT create a server-side metadata trail:
 
@@ -376,7 +448,7 @@ Read confirmation MUST NOT create a server-side metadata trail:
 
 The server processes an unrelated deposit and drain. It MUST be unable to link them to each other or to the original message — so read state propagates without the server knowing a message was sent, let alone read.
 
-### 6.5 Reference: identity derivation (corrected)
+### 6.6 Reference: identity derivation (corrected)
 
 > This replaces the book's illustrative snippet and corrects an earlier version of this section. Changes from the previous version of this spec: (1) `hkdf_salt` now performs full RFC 5869 HKDF (Extract then Expand) matching §3.3, not a bare HMAC-Extract; (2) entropy is measured with zxcvbn, not declared by the caller; (3) per-class caps and the diversity rule are enforced (§3.2); (4) the composite is zeroed in a `finally` block; (5) keypair derivation from the Access Token seed is shown. The cross-language test vectors were regenerated from this corrected construction.
 
@@ -537,7 +609,7 @@ A companion that requires user data to reside on its operator's servers in opera
 | Identity thief | Forge/guess a Quad-Key | 128-bit entropy floor + Argon2id memory-hardness (§3.4); unknown factor composition widens & randomizes attack surface (§3.2) |
 | Coercion / device seizure | Force account disclosure | Duress identity (§3.7); device-agnostic, no local persistence (§6.3) |
 | Future key compromise | Decrypt history | Double Ratchet forward secrecy (§6.2) |
-| Spam/flood | Drown the user | Lobby filtering replaces sender-ID (§5.2); flooding reaches nothing past the filter |
+| Spam/flood | Drown the user | Lobby filtering replaces sender-ID (§5.2); flooding reaches nothing past the filter but still imposes client-side drain/decrypt cost — see the rate-limiting design note in §8.3 |
 | Malicious node | Degrade service | Federation: a bad node still can't read content or build the graph (§9); it can only go offline or throttle |
 | Operator/advertiser bribery (vault) | Buy access to the vault | P3: no revenue model rewards granting access (§7.2) |
 
@@ -552,6 +624,9 @@ These are properties of *this* protocol, not of the sovereignty principles — d
 - **Polling vs. push.** The dead-drop trades real-time delivery for metadata privacy. Polling is less efficient; for most uses acceptable, for time-critical ones a constraint.
 - **Federation distributes reliability, not just trust.** A node can't read content or build the graph, but it can go offline, throttle, or impose retention policies. Federation is a security property, not a reliability guarantee.
 - **Biometric factors can't be rotated.** If a biometric hash leaks, it's compromised forever — hence "one factor among several," never sole.
+- **Lobby flood cost is client-side.** Unmetered Lobby deposits cost the sender nothing, so a Sybil flood of junk connection requests forces the recipient's client to drain and decrypt them before discarding. The filter protects the user's attention and channels, not their bandwidth. See the design note below.
+
+> **Design note (non-normative; planned for a future revision).** The intended fix for Lobby flooding is an anonymous, recipient-issued rate-limiting token (Privacy Pass / VOPRF): the Lobby owner's client issues unlinkable tokens out of band, and the node requires a valid spend-once token on each Lobby PUT. This makes flooding asymmetrically expensive while preserving zero-identity — no registry, no stake, no persistent sender identifier. Two alternatives were considered and set aside. Proof-of-Work is battery-regressive on the heterogeneous mobile clients GhostBox targets. Staked Zero-Knowledge Rate-Limiting Nullifiers (ZK-RLN, as in Waku) were REJECTED: they require a membership registry and an on-chain stake, reintroducing exactly the persistent, linkable identity GhostBox exists to abolish (**P1**). Token issuance is self-contained and touches neither the passive-server (§4) nor the no-registration (**P1**) tenet.
 
 ### 8.4 Out of scope (MUST be handled by the deployment)
 
