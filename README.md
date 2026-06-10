@@ -15,15 +15,19 @@ Both apply one design decision at two layers: **remove the intermediary's abilit
 
 **v0.3.0 — working draft.** The reference implementation covers the **Spirit Layer** (identity derivation, `src/identity.ts`), the **Specter Layer** (the dead-drop transport, `src/transport.ts`), and an **AT Protocol bridge** (`src/atproto-bridge.ts`) that lets an AT Proto / Bluesky identity publish and resolve a GhostBox address — public identity from AT Proto, private transport from GhostBox. An end-to-end integration test drives the transport with real derived identities; a runnable demonstration (`test-vectors/verify_unlinkability.mjs`) shows by inspection that the server's complete state contains no sender→recipient social graph; and an offline bridge test (`test-vectors/atproto-bridge.mjs`) verifies the discovery→private-message flow with the network mocked.
 
-Read the scope honestly: the unlinkability demonstration establishes **application-layer** unlinkability, not resistance to a network-layer adversary ([SPEC §8.4](./SPECIFICATION.md#84-out-of-scope-must-be-handled-by-the-deployment)); the transport reference uses sealed-box encryption, which gives sender anonymity but **not** the forward secrecy the spec calls for ([SPEC §6.2](./SPECIFICATION.md#62-forward-secrecy)); and the AT Proto bridge involves a deliberate **privacy tradeoff** — see below. This is infrastructure for review, not a finished or audited product.
+Read the scope honestly: the unlinkability demonstration establishes **application-layer** unlinkability, not resistance to a network-layer adversary ([SPEC §8.4](./SPECIFICATION.md#84-out-of-scope-must-be-handled-by-the-deployment)); the transport reference uses sealed-box encryption, which gives sender anonymity but **not** the forward secrecy the spec calls for ([SPEC §6.2](./SPECIFICATION.md#62-forward-secrecy)); and the AT Proto bridge involves a deliberate **privacy tradeoff** — see below. This is infrastructure for review, not a finished or audited product. See [the spec's honestly-named limitations](./SPECIFICATION.md#83-honestly-named-limitations) before building anything on it.
 
-Read the scope honestly before drawing conclusions: the unlinkability demonstration establishes **application-layer** unlinkability (the protocol's data structures don't encode who-talks-to-whom). It does **not** establish resistance to a network-layer adversary (IP/timing correlation — see [SPEC §8.4](./SPECIFICATION.md#84-out-of-scope-must-be-handled-by-the-deployment)), and the transport reference uses sealed-box encryption, which gives sender anonymity but **not** the forward secrecy the spec calls for ([SPEC §6.2](./SPECIFICATION.md#62-forward-secrecy)). This is infrastructure for review and contribution, not a finished or audited product. See [the spec's honestly-named limitations](./SPECIFICATION.md#83-honestly-named-limitations) before building anything on it.
+## Try it / read more
+
+- **Watch the dead-drop run in your browser** → [coryottenwess.com/notes/demo/ghostbox-demo.html](https://coryottenwess.com/notes/demo/ghostbox-demo.html) — real cryptography, client-side; send messages and watch the server's complete state never contain a social graph. (Source: [`demo/index.html`](./demo/index.html).)
+- **The book and the protocol, in context** → [coryottenwess.com/notes/](https://coryottenwess.com/notes/) — *Notes from an Acceleration Native*, the book this protocol is the second pillar of.
 
 ## Start here
 
 | If you want to... | Read |
 |---|---|
 | Understand the whole design | [`SPECIFICATION.md`](./SPECIFICATION.md) |
+| Watch it run (no setup) | [Live browser demo](https://coryottenwess.com/notes/demo/ghostbox-demo.html) |
 | See the principles in one screen | [Design Principles](./SPECIFICATION.md#1-design-principles) |
 | Understand the threat model | [§8 Threat Model](./SPECIFICATION.md#8-threat-model) |
 | Build a client | [`src/identity.ts`](./src/identity.ts) + [`src/transport.ts`](./src/transport.ts) (TypeScript, canonical) |
