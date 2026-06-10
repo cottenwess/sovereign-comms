@@ -1,0 +1,39 @@
+{
+  "lexicon": 1,
+  "id": "com.ghostbox.identity",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A public pointer from an AT Protocol identity to a GhostBox address. Publishing this record lets anyone who can resolve the repo's handle/DID discover a GhostBox locator and encryption key, and thereby open a private, unlinkable GhostBox conversation. NOTE: this record is PUBLIC and effectively permanent (AT Proto repos are synced and archived). It reveals that the account uses GhostBox and which locator, bound to the account's handle. It does NOT reveal message contents or the account's GhostBox social graph. Do not publish a locator that must remain secret; see the GhostBox Corporeal Layer unlisted/proximity mode for that case.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": ["locatorHash", "encryptionPublicKey", "protocolVersion", "createdAt"],
+        "properties": {
+          "locatorHash": {
+            "type": "string",
+            "description": "GhostBox Locator Hash, lowercase hex. The public deposit address for this identity's dead-drop mailbox.",
+            "minLength": 32,
+            "maxLength": 64
+          },
+          "encryptionPublicKey": {
+            "type": "string",
+            "description": "X25519 public key, lowercase hex (32 bytes / 64 hex chars). Senders seal messages to this key.",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "protocolVersion": {
+            "type": "string",
+            "description": "GhostBox protocol version this address was minted under, e.g. 'ghostbox/0.3'.",
+            "maxLength": 32
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When this identity record was created."
+          }
+        }
+      }
+    }
+  }
+}
