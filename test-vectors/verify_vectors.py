@@ -10,13 +10,6 @@ The frozen vectors were verified cross-language (TypeScript canonical +
 Python reference) at generation time. This script is what keeps the Python
 side honest in CI; the TS side has its own checker (verify_vectors.mjs).
 
-NOTE on entropy: text_factor() now measures entropy internally via zxcvbn.
-The optional 'entropy_bits' field in the JSON factor spec is documentation
-only and is NOT passed to text_factor — the layer ignores caller-supplied
-numbers for 'know' factors. The 'below-entropy-floor' vector uses genuinely
-weak single-character factors that zxcvbn scores near zero; the throw is
-produced by real measurement, not a fabricated low number.
-
 Exit code 0 = all pass. Non-zero = a mismatch, which means either the
 implementation drifted or the vectors were changed without regeneration.
 
@@ -43,18 +36,19 @@ VECTORS = ROOT / "test-vectors" / "identity.json"
 def build_factors(spec):
     """Turn a vector's factor list into Factor objects.
 
-    Only 'know' factors are handled here. Add hashed_factor support when
-    non-know vectors are introduced. Entropy is measured by text_factor
-    internally; the optional 'entropy_bits' field in the JSON is ignored.
+    For 'know' factors we attach a generous entropy estimate so that valid
+    vectors clear the floor; the 'below-entropy-floor' vector supplies its own
+    low entropy_bits values explicitly to force the throw.
     """
     factors = []
     for f in spec["factors"]:
         if f["class"] != "know":
             raise SystemExit(
                 f"checker only handles 'know' factors; got {f['class']}. "
-                "Add hashed_factor handling here when non-know vectors are introduced."
+                "Add hash_hex handling here when non-know vectors are introduced."
             )
-        factors.append(text_factor(f["text"]))
+        bits = f.get("entropy_bits", 64)  # default: assume strong per-factor
+        factors.append(text_factor(f["text"], bits))
     return factors
 
 

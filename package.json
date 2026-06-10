@@ -1,6 +1,6 @@
 {
   "name": "sovereign-comms",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Reference implementation of the GhostBox Protocol and Companion Permissions Layer",
   "license": "AGPL-3.0-or-later",
   "author": "Cory A. Ottenwess",
@@ -9,14 +9,16 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node test-vectors/verify_vectors.mjs",
-    "test:py": "python test-vectors/verify_vectors.py"
+    "test:py": "python test-vectors/verify_vectors.py",
+    "test:integration": "node test-vectors/integration.mjs",
+    "demo:unlinkability": "node test-vectors/verify_unlinkability.mjs",
+    "test:all": "npm run typecheck && npm test && npm run test:integration && npm run test:atproto && npm run demo:unlinkability",
+    "test:atproto": "node test-vectors/atproto-bridge.mjs"
   },
   "dependencies": {
+    "@noble/ciphers": "^1.0.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
-    "@zxcvbn-ts/core": "^3.0.4",
-    "@zxcvbn-ts/language-common": "^3.0.4",
-    "@zxcvbn-ts/language-en": "^3.0.2",
     "hash-wasm": "^4.12.0"
   },
   "devDependencies": {

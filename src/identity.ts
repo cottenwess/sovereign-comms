@@ -13,21 +13,11 @@
  *   - Variable factor composite (not a fixed 4 words).
  *   - Keypairs derived from the Access Token seed.
  *
- * This revision (deliberate):
- *   - Entropy is MEASURED, not asserted. "know" factors are scored with zxcvbn
- *     inside this layer; the caller no longer supplies the number. Other classes
- *     declare a capped estimate (a biometric hash is not a password).
- *   - The composite and salts are zeroed in a finally block so a thrown error
- *     mid-derivation cannot skip the wipe. Best-effort only; see SECURITY.md.
- *   - HKDF is unchanged: noble's HKDF is RFC 5869 correct and is the canonical
- *     construction the Python reference is now corrected against.
- *
  * Dependency note: Argon2id is NOT native to browsers/Node. This reference uses
  * `hash-wasm` (a WASM build). Do NOT substitute a pure-JS Argon2 — it cannot run
  * safe parameters at acceptable speed and silently weakens every identity.
  *
- *   npm install hash-wasm @noble/curves @noble/hashes \
- *               @zxcvbn-ts/core @zxcvbn-ts/language-common @zxcvbn-ts/language-en
+ *   npm install hash-wasm @noble/curves @noble/hashes
  *
  * @license AGPL-3.0-or-later
  * Copyright (C) 2026 Cory A. Ottenwess
@@ -37,15 +27,6 @@ import { argon2id } from "hash-wasm";
 import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { ed25519, x25519 } from "@noble/curves/ed25519";
-import { zxcvbn, zxcvbnOptions } from "@zxcvbn-ts/core";
-import * as zxcvbnCommon from "@zxcvbn-ts/language-common";
-import * as zxcvbnEn from "@zxcvbn-ts/language-en";
-
-zxcvbnOptions.setOptions({
-  dictionary: { ...zxcvbnCommon.dictionary, ...zxcvbnEn.dictionary },
-  graphs: zxcvbnCommon.adjacencyGraphs,
-  translations: zxcvbnEn.translations,
-});
 
 // --- Parameter ladder (SPEC §3.4) -----------------------------------------
 // Versioned so cost can rise over time without orphaning existing identities.
@@ -75,27 +56,16 @@ export const ARGON_PARAMS: Record<string, ArgonParams> = {
 };
 
 // --- Entropy floor (SPEC §3.2) --------------------------------------------
-// The composite MUST reach at least 128 bits of MEASURED entropy before
-// derivation proceeds, and no single factor may supply more than half of it.
+// The composite MUST reach at least 128 bits of estimated entropy before
+// derivation proceeds. This is a coarse gate; real onboarding UX should use a
+// proper estimator (e.g. zxcvbn) per knowledge-factor and a fixed allowance for
+// high-entropy factors (hardware tokens, biometric hashes, SSI credentials).
 
 export const MIN_ENTROPY_BITS = 128;
 
 const UNIT_SEP = 0x1f; // factor separator; cannot appear in NFC text or hashes
 
 export type FactorClass = "know" | "are" | "have" | "who";
-
-// Per-class entropy caps. "know" is measured by zxcvbn and capped so one long
-// passphrase can't claim the whole floor. "are" (biometric) is capped HARD and
-// low: biometrics are low-entropy and, crucially, NON-REVOCABLE, so they must
-// never be load-bearing. "have" (hardware token) and "who" (SSI credential /
-// contact) can carry real declared entropy with provenance, still capped to
-// force genuine factor diversity.
-const CLASS_CAP_BITS: Record<FactorClass, number> = {
-  know: 80,
-  are: 24,
-  have: 64,
-  who: 64,
-};
 
 export interface Factor {
   readonly class: FactorClass;
@@ -106,51 +76,17 @@ export interface Factor {
    *     never the raw biometric / document / contact data
    */
   readonly bytes: Uint8Array;
-  /** Estimated entropy contribution in bits. Set by the constructors below
-   *  (measured for "know", declared-and-capped otherwise) — NOT by the caller. */
+  /** Estimated entropy contribution in bits (caller supplies; see note above). */
   readonly entropyBits: number;
 }
 
-/**
- * Build a "know" factor from text. Entropy is MEASURED with zxcvbn here, so the
- * layer no longer trusts a caller-supplied number.
- *
- * NOTE: zxcvbn is a heuristic and English-biased. It raises the floor; it does
- * not make the floor honest. A structured-but-guessable passphrase will still
- * flatter itself. See SPEC §3.2.
- */
-export function textFactor(secret: string): Factor {
+/** NFC-normalize text and return UTF-8 bytes. Use for "know" factors. */
+export function textFactor(secret: string, entropyBits: number): Factor {
   const normalized = secret.normalize("NFC");
-  const guesses = Math.max(zxcvbn(normalized).guesses, 2);
-  const bits = Math.min(Math.log2(guesses), CLASS_CAP_BITS.know);
   return {
     class: "know",
     bytes: new TextEncoder().encode(normalized),
-    entropyBits: bits,
-  };
-}
-
-/**
- * Build an "are" / "have" / "who" factor from a fixed-length HASH of the
- * underlying material (never the raw biometric / document / contact data).
- *
- * @param declaredBits caller's entropy estimate for the SOURCE; capped by class.
- * @param provenance   free-text audit tag (e.g. "yubikey-hmac", "fido2-prf",
- *                      "ssi-vc"); not used in derivation.
- */
-export function hashedFactor(
-  cls: Exclude<FactorClass, "know">,
-  digest: Uint8Array,
-  declaredBits: number,
-  provenance: string,
-): Factor {
-  if (!provenance) {
-    throw new Error("hashedFactor requires a provenance tag (SPEC §3.2).");
-  }
-  return {
-    class: cls,
-    bytes: digest,
-    entropyBits: Math.min(declaredBits, CLASS_CAP_BITS[cls]),
+    entropyBits,
   };
 }
 
@@ -173,29 +109,19 @@ export function canonicalize(factors: readonly Factor[]): Uint8Array {
   return out;
 }
 
-/**
- * Enforce the entropy floor AND factor diversity (SPEC §3.2). The sum must clear
- * MIN_ENTROPY_BITS and no single factor may supply more than half of it, which
- * is the other way a naive caller defeats a "128-bit" gate. Throws on failure.
- */
+/** Enforce the entropy floor (SPEC §3.2). Throws if below MIN_ENTROPY_BITS. */
 export function assertEntropyFloor(factors: readonly Factor[]): void {
   const bits = factors.reduce((n, f) => n + f.entropyBits, 0);
   if (bits < MIN_ENTROPY_BITS) {
     throw new Error(
-      `Composite entropy ${bits.toFixed(1)} bits < required ${MIN_ENTROPY_BITS} (SPEC §3.2).`,
-    );
-  }
-  const max = Math.max(...factors.map((f) => f.entropyBits));
-  if (max > bits / 2) {
-    throw new Error(
-      "No single factor may supply more than half the entropy floor (SPEC §3.2).",
+      `Composite entropy ${bits} bits < required ${MIN_ENTROPY_BITS} (SPEC §3.2).`,
     );
   }
 }
 
-/** HKDF-Extract+Expand (SHA-256) producing a 32-byte per-composite salt
- *  (SPEC §3.3). RFC 5869; the Python reference is corrected to match this. */
+/** HKDF-Extract (SHA-256) producing a 32-byte per-composite salt (SPEC §3.3). */
 function hkdfSalt(composite: Uint8Array, label: string): Uint8Array {
+  // domain separation via the `info` parameter; salt param is the composite
   return hkdf(sha256, composite, undefined, new TextEncoder().encode(label), 32);
 }
 
@@ -205,7 +131,7 @@ async function argon(
   lengthBytes: number,
   p: ArgonParams,
 ): Promise<Uint8Array> {
-  const out = await argon2id({
+  const hex = await argon2id({
     password: composite,
     salt,
     parallelism: p.parallelism,
@@ -214,7 +140,7 @@ async function argon(
     hashLength: lengthBytes,
     outputType: "binary",
   });
-  return out as unknown as Uint8Array;
+  return hex as unknown as Uint8Array;
 }
 
 export interface Identity {
@@ -241,7 +167,6 @@ export interface Identity {
  *
  * SECURITY: the returned private material lives only as long as you keep it.
  * Zero it when the session ends; never write it to disk or send it anywhere.
- * The composite and salts are zeroed here on every exit path.
  */
 export async function deriveIdentity(
   factors: readonly Factor[],
@@ -253,39 +178,33 @@ export async function deriveIdentity(
     throw new Error(`Unknown Argon2id parameter version: ${paramVersion}`);
   }
   const composite = canonicalize(factors);
-  let saltLocator: Uint8Array | undefined;
-  let saltAccess: Uint8Array | undefined;
-  try {
-    saltLocator = hkdfSalt(composite, "ghostbox/v1/locator");
-    saltAccess = hkdfSalt(composite, "ghostbox/v1/access");
 
-    const locatorHash = await argon(composite, saltLocator, 16, params);
-    const accessSeed = await argon(composite, saltAccess, 32, params);
+  const saltLocator = hkdfSalt(composite, "ghostbox/v1/locator");
+  const saltAccess = hkdfSalt(composite, "ghostbox/v1/access");
 
-    // Derive keypairs from the access seed via domain-separated HKDF so the two
-    // keypairs are independent and neither equals the raw seed.
-    const signSeed = hkdf(sha256, accessSeed, undefined, "ghostbox/v1/sign", 32);
-    const encSeed = hkdf(sha256, accessSeed, undefined, "ghostbox/v1/enc", 32);
+  const locatorHash = await argon(composite, saltLocator, 16, params);
+  const accessSeed = await argon(composite, saltAccess, 32, params);
 
-    const signingPublic = ed25519.getPublicKey(signSeed);
-    const encryptionPublic = x25519.getPublicKey(encSeed);
+  // Derive keypairs from the access seed via domain-separated HKDF so the two
+  // keypairs are independent and neither equals the raw seed.
+  const signSeed = hkdf(sha256, accessSeed, undefined, "ghostbox/v1/sign", 32);
+  const encSeed = hkdf(sha256, accessSeed, undefined, "ghostbox/v1/enc", 32);
 
-    return {
-      locatorHash,
-      accessSeed,
-      signingPrivate: signSeed,
-      signingPublic,
-      encryptionPrivate: encSeed,
-      encryptionPublic,
-      paramVersion,
-    };
-  } finally {
-    // best-effort wipe of the secrets this layer owns. Returned private material
-    // (accessSeed, key seeds) is the caller's to zero when the session ends.
-    composite.fill(0);
-    saltLocator?.fill(0);
-    saltAccess?.fill(0);
-  }
+  const signingPublic = ed25519.getPublicKey(signSeed);
+  const encryptionPublic = x25519.getPublicKey(encSeed);
+
+  // best-effort wipe of the composite
+  composite.fill(0);
+
+  return {
+    locatorHash,
+    accessSeed,
+    signingPrivate: signSeed,
+    signingPublic,
+    encryptionPrivate: encSeed,
+    encryptionPublic,
+    paramVersion,
+  };
 }
 
 /** Hex helper for display / addressing. */

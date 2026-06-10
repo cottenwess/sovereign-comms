@@ -1,72 +1,86 @@
 # Test Vectors
 
 Cross-language conformance vectors. The TypeScript canonical implementation
-(`../src`) and the Python reference (`../reference`) MUST both reproduce every
-vector here byte-for-byte. If they diverge, one of them is wrong — and that is
-exactly what these vectors exist to catch.
+(`../src`) and the Python reference (`../reference`) both reproduce every vector
+here byte-for-byte. These values were generated and verified across both
+languages at the same time — if the two ever diverge, one implementation has
+drifted, and that is exactly what these vectors exist to catch.
 
 ## Status
 
-**Stub.** `identity.json` contains the *structure* and a placeholder entry. The
-real expected values must be generated once and then frozen, because they pin the
-derivation. This is a deliberately open task — see "Generating vectors" below —
-so that the first committed values are produced by a clean, reviewed run rather
-than copied from chat.
+**Frozen and enforced.** `identity.json` holds verified expected values. Two
+checkers validate against them, and both run in CI on every push and PR:
+
+- `verify_vectors.mjs` — checks the TypeScript canonical implementation
+- `verify_vectors.py` — checks the Python reference implementation
+
+Run locally from the repository root:
+
+```bash
+node test-vectors/verify_vectors.mjs    # or: npm test
+python test-vectors/verify_vectors.py   # or: npm run test:py
+```
+
+> Changing any value in `identity.json` without regenerating from a reviewed run
+> will break the checkers — by design. The frozen values pin the derivation;
+> they are not meant to be edited by hand.
+
+## What the vectors cover
+
+- **`passphrase-only-book-demo`** — the four-word key from the book's Appendix B.
+  Weakest valid configuration; included to pin the documented example, not as a
+  recommended key composition.
+- **`ordering-sensitivity`** — the same four factors reordered. Produces a
+  completely different identity, proving factor order is part of the secret
+  (SPEC §3.6). The checkers assert it differs from the demo above.
+- **`below-entropy-floor`** — a composite under the 128-bit floor. Derivation
+  MUST throw (SPEC §3.2); the checkers assert the throw.
 
 ## Format (`identity.json`)
 
 ```jsonc
 {
-  "spec_section": "3",
-  "argon_param_version": "argon2id-v1",
-  "vectors": [
-    {
-      "name": "passphrase-only-book-demo",
-      "note": "Weakest valid config. Book Appendix B words. Demo only.",
-      "factors": [
-        { "class": "know", "text": "Nebula"  },
-        { "class": "know", "text": "77"      },
-        { "class": "know", "text": "Correct" },
-        { "class": "know", "text": "Horse"   }
-      ],
-      "expected": {
-        "locator_hash_hex": "TODO_GENERATE",
-        "signing_public_hex": "TODO_GENERATE",
-        "encryption_public_hex": "TODO_GENERATE"
-      }
-    }
-  ]
+  "name": "passphrase-only-book-demo",
+  "param_version": "argon2id-v1",
+  "factors": [
+    { "class": "know", "text": "Nebula" }
+    // ...
+  ],
+  "expected": {
+    "locator_hash_hex": "...",
+    "signing_public_hex": "...",
+    "encryption_public_hex": "..."
+  }
 }
 ```
 
-Notes on the format:
+Notes:
 - `factors[].text` is only valid for `class: "know"`. For `are` / `have` / `who`
   factors a vector MUST supply `hash_hex` (the fixed-length factor hash), never
   raw data — the spec forbids raw biometric/document/contact data entering the
-  system (SPEC §3.2).
-- Private outputs (`access_seed`, private keys) are intentionally **not** stored
-  as expected values. Vectors pin public outputs only.
+  system (SPEC §3.2). The current checkers handle `know` factors only and will
+  fail loudly if a non-`know` vector is added before that support is written.
+- Private outputs (access seed, private keys) are intentionally NOT stored.
+  Vectors pin public outputs only.
+- `must_differ_from` asserts two vectors produce distinct identities.
+- `expected.throws` + `error_contains` assert a derivation rejects bad input.
 
-## Generating vectors (open task)
+## Regenerating (only with review)
 
-The first real values should be produced by running both implementations against
-the input set and confirming they agree before committing:
+If a deliberate, reviewed change to the derivation requires new values:
 
-1. Run `../reference/identity.py` against each vector's factors.
-2. Run the equivalent through `../src/identity.ts`.
-3. Confirm `locator_hash_hex`, `signing_public_hex`, `encryption_public_hex`
-   match across both languages.
-4. Only then write the agreed values into `identity.json` and remove the
-   `TODO_GENERATE` markers.
+1. Make the change in BOTH `../src/identity.ts` and `../reference/identity.py`.
+2. Run both checkers; they will fail against the old frozen values.
+3. Produce the new values from a clean run of both languages and confirm they
+   agree with each other before writing them into `identity.json`.
+4. Only then commit the updated vectors, with the reasoning in the commit.
 
-A small generator/checker script (either language) that automates steps 1–3 is a
-welcome first contribution — see `../CONTRIBUTING.md`.
+## Coverage still wanted
 
-## Coverage wanted
+Contributions welcome (see `../CONTRIBUTING.md`):
 
-- The book demo above (passphrase-only).
-- A mixed-factor composite (know + have + are) using `hash_hex` factors.
-- A vector at exactly the entropy floor, and one just below it (which MUST throw).
+- A mixed-factor composite (know + have + are) using `hash_hex` factors, plus the
+  checker support to handle non-`know` classes.
 - A vector under `argon2id-v2` params to pin the second ladder rung.
-- Canonicalization edge cases: NFC normalization, factor ordering (reordering the
-  same factors MUST produce a different identity), and the unit-separator boundary.
+- Additional canonicalization edge cases (NFC normalization boundaries, the
+  unit-separator boundary).
