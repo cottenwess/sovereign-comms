@@ -1,0 +1,44 @@
+{
+  "name": "sovereign-comms",
+  "version": "0.3.1",
+  "description": "Reference implementation of the GhostBox Protocol and Companion Permissions Layer",
+  "license": "AGPL-3.0-or-later",
+  "author": "Cory A. Ottenwess",
+  "type": "module",
+  "main": "src/identity.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "npx tsx test-vectors/verify_vectors.mts",
+    "test:py": "python test-vectors/verify_vectors.py",
+    "test:integration": "npx tsx test-vectors/integration.mts",
+    "test:atproto": "npx tsx test-vectors/atproto-bridge.mts",
+    "demo:unlinkability": "node test-vectors/verify_unlinkability.mjs",
+    "test:all": "npm run typecheck && npm test && npm run test:py && npm run test:integration && npm run test:atproto && npm run test:commitment && npm run test:statesync && npm run test:ratchet && npm run demo:unlinkability",
+    "test:commitment": "npx tsx test-vectors/key-commitment.mts",
+    "test:statesync": "npx tsx test-vectors/state-sync.mts",
+    "test:ratchet": "npx tsx test-vectors/ratchet.mts"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.0.0",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "hash-wasm": "^4.12.0",
+    "@zxcvbn-ts/core": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-en": "^3.0.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "privacy",
+    "cryptography",
+    "dead-drop",
+    "zero-identity",
+    "data-sovereignty",
+    "argon2id",
+    "metadata-resistance",
+    "ghostbox"
+  ]
+}
