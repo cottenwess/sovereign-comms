@@ -1,0 +1,224 @@
+{
+  "manifest_version": 1,
+  "protocol_version": "0.4.0",
+  "generated": "2026-06-12",
+  "purpose": "Source-of-truth integrity manifest. Before extending the repo in any session, verify your working files against these SHA-256 hashes with verify_manifest.mjs. A mismatch means your baseline is stale or diverged - resolve that BEFORE building, or you will repeat the cross-language drift that v0.3.1 fixed.",
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "66913ce86d89c4d12e078581ea54981b417b351e9202d035b44e90425231c0b1",
+      "bytes": 2425,
+      "lines": 98
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "b3ffcc6cdf8505bf1d996dfad68434bbe62e8b57d5ca295c2dae25762f4d9588",
+      "bytes": 67,
+      "lines": 9
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "ff8b037be6459d9de38417a0b98f8c45cd7d4913a91742f1b595e0e619cbf158",
+      "bytes": 7597,
+      "lines": 139
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "dd699e2dcdf0352bc1db9381e0334fbd33a88fc0d2ac7d681cd413abc0ea7985",
+      "bytes": 3508,
+      "lines": 51
+    },
+    {
+      "path": "GhostBox-Technical-Reference-v0.1.0.pdf",
+      "sha256": "7516799fc6c36116e1636200685e0d679a3d462f7cecbab74b5a6ecf0448bbb1",
+      "bytes": 491700,
+      "lines": 2345
+    },
+    {
+      "path": "GhostBox-WhitePaper-v0.1.0.pdf",
+      "sha256": "4f22e37449d996547e4d0932bbebf653abcebbf798c1e6e7f0e0cbe0ea5c6f33",
+      "bytes": 281198,
+      "lines": 1367
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "bytes": 34523,
+      "lines": 662
+    },
+    {
+      "path": "PROJECT.md",
+      "sha256": "2d5f0dd52dc223effa7311b9207c90105a943656a59f8f9e8997f3ecd1cf689f",
+      "bytes": 12887,
+      "lines": 135
+    },
+    {
+      "path": "README.md",
+      "sha256": "4645ea273bd238598bb7b6184a764f77d2287911155feb1f30b4ef48d5094cff",
+      "bytes": 10934,
+      "lines": 99
+    },
+    {
+      "path": "SECURITY.md",
+      "sha256": "b58d72c8c4bd77ae66cb5abc8d36c976b1b3da97e60ac8c3107be6a849500487",
+      "bytes": 1785,
+      "lines": 42
+    },
+    {
+      "path": "SISTER_PROJECT_INSTRUCTIONS.md",
+      "sha256": "f7973ec9b5bb84229154fb156906d8df2c52978eac060eaec0628e5b87903be0",
+      "bytes": 9306,
+      "lines": 135
+    },
+    {
+      "path": "SPECIFICATION.md",
+      "sha256": "b38fdf03d378521c3f29d409b533bc3f509e86873e52a7e79e18215fff8b9da7",
+      "bytes": 43861,
+      "lines": 609
+    },
+    {
+      "path": "demo/index.html",
+      "sha256": "0574da8556e29006da8acc4141b265c1a60f5a3e07a0849177477ea769653089",
+      "bytes": 14398,
+      "lines": 253
+    },
+    {
+      "path": "lexicons/com.ghostbox.identity.json",
+      "sha256": "ff60fff2b0195fbd4bede0e61902a432f7119d5829dfc087439ad03b9433cd59",
+      "bytes": 1882,
+      "lines": 40
+    },
+    {
+      "path": "make_manifest.mjs",
+      "sha256": "9c7a33bd1ffc35e8511d908686ccb5e5ea3f0ee83edaa13623d23811268b6643",
+      "bytes": 2165,
+      "lines": 60
+    },
+    {
+      "path": "package.json",
+      "sha256": "b95ccaa37f56968a1cc413fb05f1a79e58b07951339940126c469096353afd19",
+      "bytes": 1635,
+      "lines": 46
+    },
+    {
+      "path": "reference/identity.py",
+      "sha256": "65636e1730deaf0559a65bf8ed03f16730c402cfbd0433f78ab20fef19492e67",
+      "bytes": 9998,
+      "lines": 246
+    },
+    {
+      "path": "src/atproto-bridge.ts",
+      "sha256": "f28d99102656743124ae7bb37be832176a17d630629f6aba2ff112cf8a347070",
+      "bytes": 10095,
+      "lines": 240
+    },
+    {
+      "path": "src/envelope.ts",
+      "sha256": "8f37da624fdb7bdc2b76cde5b264b4da706db0dee4601551aa511e838d9e7f64",
+      "bytes": 5309,
+      "lines": 139
+    },
+    {
+      "path": "src/identity.ts",
+      "sha256": "2c68136e85857047005276469036146f3c54c25a82696c51e5310021e31c4861",
+      "bytes": 10975,
+      "lines": 295
+    },
+    {
+      "path": "src/ratchet.ts",
+      "sha256": "dc02bfd7721c4ff3947ee080518ea84b5931aee3ec63cd8c216c4cfa5186f6c7",
+      "bytes": 10294,
+      "lines": 254
+    },
+    {
+      "path": "src/statesync.ts",
+      "sha256": "ac772094282d59bc86a1465786e9c428add8f55b69b801fac0815b1c115576b4",
+      "bytes": 8923,
+      "lines": 210
+    },
+    {
+      "path": "src/transport.ts",
+      "sha256": "b4ad4869591a2ba11c4233283c169af4a5cb3cd0c0131958ca229276d240c439",
+      "bytes": 19182,
+      "lines": 455
+    },
+    {
+      "path": "test-vectors/README.md",
+      "sha256": "c5412430a43fd3767931c3a334ca3806eeb481ac4908308481dd5fe291b12ff0",
+      "bytes": 1674,
+      "lines": 33
+    },
+    {
+      "path": "test-vectors/atproto-bridge.mts",
+      "sha256": "749c8abf4e66d8aed1784daca9696b216091e085eca411f31632a8a8d7b63c3b",
+      "bytes": 4393,
+      "lines": 111
+    },
+    {
+      "path": "test-vectors/fs-transport.mts",
+      "sha256": "d6a6b2bd69c4066157e5e8aeb80cf82dc7e09a59942083e7227a2b9625c7d727",
+      "bytes": 10397,
+      "lines": 225
+    },
+    {
+      "path": "test-vectors/identity.json",
+      "sha256": "58481abb2a8d74a118d7e18b173f9fb8c4c27bbf00a8418a42ace9a5d10eb1bc",
+      "bytes": 4299,
+      "lines": 137
+    },
+    {
+      "path": "test-vectors/integration.mts",
+      "sha256": "272badd24c7495282c199b253646b4c82b4efaac4bf234b7a7c66d93dc7dd7eb",
+      "bytes": 3932,
+      "lines": 118
+    },
+    {
+      "path": "test-vectors/key-commitment.mts",
+      "sha256": "53dbf1ed016cd0d0f9e9cb04fa4cbc023b8fee58e27ec43283530c4db956e055",
+      "bytes": 3060,
+      "lines": 78
+    },
+    {
+      "path": "test-vectors/ratchet.mts",
+      "sha256": "0a105755f1bf9342648206c3ca0d41bd80d0b25a677419a3ea59d296c93bdb5a",
+      "bytes": 5178,
+      "lines": 141
+    },
+    {
+      "path": "test-vectors/state-sync.mts",
+      "sha256": "184b0a6c1737c38be77f7babe6c773860c707e8266ee19f3524bddf493456f84",
+      "bytes": 6732,
+      "lines": 155
+    },
+    {
+      "path": "test-vectors/verify_unlinkability.mjs",
+      "sha256": "b1e1bcd72d946dcdb3c8a049f86165e2f577360490dc09c9d17baf42e6c0d7c9",
+      "bytes": 7207,
+      "lines": 155
+    },
+    {
+      "path": "test-vectors/verify_vectors.mts",
+      "sha256": "5558dbab65f49e6b7e9d2e9663ee19278cb4ced8ea5ac6b20ce7384a22800913",
+      "bytes": 3142,
+      "lines": 91
+    },
+    {
+      "path": "test-vectors/verify_vectors.py",
+      "sha256": "76530156196c80131c0f87e643254e27e6e39e7660e376ad1fb375c96befdc3d",
+      "bytes": 2520,
+      "lines": 80
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "05689ca20ab91db994c505100a06fabbfd64132daaa9488f3666e942962be6a0",
+      "bytes": 303,
+      "lines": 15
+    },
+    {
+      "path": "verify_manifest.mjs",
+      "sha256": "3b64c8f5ce7e34903783f0eaa7ddbaaf8df59e1433c2ffefc55d52ec4e27cb2e",
+      "bytes": 2120,
+      "lines": 54
+    }
+  ]
+}

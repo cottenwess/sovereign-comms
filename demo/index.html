@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GhostBox — Live Dead-Drop Demo</title>
+<meta name="description" content="Watch a zero-identity message protocol run: the server stores the message but never learns who sent it to whom.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0a0b; --ink2:#141416; --paper:#f4f1ea; --dim:#c9c5ba;
+    --red:#d22f27; --red2:#ff3b30; --rule:rgba(244,241,234,0.14);
+    --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --serif:'Fraunces',Georgia,serif;
+    --green:#4fae54;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--ink);color:var(--paper);font-family:var(--serif);line-height:1.55;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
+    background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.18)0,rgba(0,0,0,.18)1px,transparent 1px,transparent 3px);opacity:.25;mix-blend-mode:multiply}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px;position:relative;z-index:2}
+  .mono{font-family:var(--mono)}
+  header.top{border-bottom:1px solid var(--rule);padding-bottom:22px;margin-bottom:30px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);margin-bottom:14px}
+  h1{font-family:var(--serif);font-weight:500;font-size:clamp(2rem,5vw,3.2rem);line-height:1.04;letter-spacing:-.02em;margin-bottom:14px}
+  h1 em{font-style:italic;color:var(--red2)}
+  .lede{max-width:64ch;color:#e8e4da;font-size:1.05rem}
+  .lede strong{color:var(--red2);font-weight:500}
+  a{color:var(--red2);text-decoration:none;border-bottom:1px solid var(--rule)}
+  a:hover{border-color:var(--red2)}
+
+  .stage{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin:30px 0}
+  @media(max-width:760px){.stage{grid-template-columns:1fr}}
+  .panel{background:var(--ink);padding:22px}
+  .panel h2{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+  .panel .who{font-family:var(--serif);font-style:italic;font-size:1.4rem;margin-bottom:14px}
+  .panel.alice .who{color:var(--paper)}
+  .panel.bob .who{color:var(--paper)}
+  .idline{font-family:var(--mono);font-size:11px;color:var(--dim);word-break:break-all;line-height:1.7;margin-bottom:14px;min-height:2.6em}
+  .idline b{color:var(--red2);font-weight:400}
+  input[type=text]{width:100%;font-family:var(--mono);font-size:13px;padding:11px 12px;background:rgba(0,0,0,.25);border:1px solid var(--rule);color:var(--paper);outline:none;margin-bottom:10px}
+  input[type=text]:focus{border-color:var(--red2)}
+  button{font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:11px 16px;border:1px solid var(--paper);background:transparent;color:var(--paper);cursor:pointer;transition:all .15s}
+  button:hover:not(:disabled){background:var(--paper);color:var(--ink)}
+  button.primary{background:var(--red);border-color:var(--red);color:#fff}
+  button.primary:hover:not(:disabled){background:var(--red2);border-color:var(--red2)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .inbox{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px}
+  .inbox .empty{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .msg{font-family:var(--mono);font-size:12px;background:var(--ink2);border-left:2px solid var(--green);padding:8px 10px;margin-bottom:6px}
+
+  .server{background:#070708;border:1px solid var(--rule);margin:0 0 24px}
+  .server .bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--rule)}
+  .dot{width:10px;height:10px;border-radius:50%;background:#2a2a2d}.dot.r{background:var(--red)}
+  .server .bar .t{margin-left:8px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--dim)}
+  .server pre{padding:16px;font-family:var(--mono);font-size:12px;line-height:1.7;color:#cfccc4;white-space:pre-wrap;word-break:break-word;min-height:120px}
+  .server .c{color:#6f6c64}.server .g{color:var(--green)}.server .rd{color:var(--red2)}.server .w{color:var(--paper)}
+
+  .truth{border:1px solid var(--rule);padding:16px 18px;margin-bottom:24px;font-family:var(--mono);font-size:12px;line-height:1.8}
+  .truth .lbl{color:var(--dim);text-transform:uppercase;letter-spacing:.1em;font-size:10.5px}
+  .truth .edge{color:var(--paper)}
+  .truth .arrow{color:var(--red2)}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  .finding{border-left:3px solid var(--red);background:var(--ink2);padding:18px 20px;font-size:1rem;line-height:1.6}
+  .finding b{color:var(--red2);font-weight:500}
+  .caveat{margin-top:20px;font-family:var(--mono);font-size:11px;color:#7c786f;line-height:1.7;max-width:74ch}
+  .foot{margin-top:30px;border-top:1px solid var(--rule);padding-top:18px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">GhostBox Protocol · live demo</div>
+    <h1>The server stores the message.<br>It never learns <em>who sent it to whom.</em></h1>
+    <p class="lede">This runs the real GhostBox dead-drop in your browser — actual X25519 + XChaCha20-Poly1305, no mockups. Send messages between Alice and Bob, then watch the <strong>server state</strong> panel. The messages are there. The social graph never is.</p>
+  </header>
+
+  <div class="controls">
+    <button id="btnInit" class="primary">① Generate identities</button>
+    <button id="btnReset" disabled>Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="panel alice">
+      <h2>Participant A</h2>
+      <div class="who">Alice</div>
+      <div class="idline" id="aliceId">— not yet generated —</div>
+      <input type="text" id="aliceMsg" placeholder="message to Bob…" disabled>
+      <button id="aliceSend" disabled>Send to Bob →</button>
+      <button id="aliceDrain" disabled>Check my inbox</button>
+      <div class="inbox" id="aliceInbox"><div class="empty">inbox empty</div></div>
+    </div>
+    <div class="panel bob">
+      <h2>Participant B</h2>
+      <div class="who">Bob</div>
+      <div class="idline" id="bobId">— not yet generated —</div>
+      <input type="text" id="bobMsg" placeholder="message to Alice…" disabled>
+      <button id="bobSend" disabled>Send to Alice →</button>
+      <button id="bobDrain" disabled>Check my inbox</button>
+      <div class="inbox" id="bobInbox"><div class="empty">inbox empty</div></div>
+    </div>
+  </div>
+
+  <div class="truth">
+    <div class="lbl">The true conversation (what you, the observer, know)</div>
+    <div id="trueGraph"><span class="c">— send a message to begin —</span></div>
+  </div>
+
+  <div class="server">
+    <div class="bar"><span class="dot r"></span><span class="dot"></span><span class="dot"></span><span class="t">drop-server · complete state (everything a seizure would yield)</span></div>
+    <pre id="serverState"><span class="c">// generate identities, then send a message</span></pre>
+  </div>
+
+  <div class="finding" id="finding" style="display:none"></div>
+
+  <p class="caveat" id="caveat" style="display:none"></p>
+
+  <div class="foot">
+    Real cryptography via <span class="mono">@noble</span>, run client-side. Source &amp; spec:
+    <a href="https://github.com/cottenwess/sovereign-comms">github.com/cottenwess/sovereign-comms</a> ·
+    <a href="https://coryottenwess.com/notes/">about the book</a>
+  </div>
+</div>
+
+<script type="module">
+import { x25519, ed25519 } from "https://esm.sh/@noble/curves@1.9.7/ed25519";
+import { xchacha20poly1305 } from "https://esm.sh/@noble/ciphers@1.0.0/chacha";
+import { hkdf } from "https://esm.sh/@noble/hashes@1.8.0/hkdf";
+import { sha256 } from "https://esm.sh/@noble/hashes@1.8.0/sha256";
+import { randomBytes } from "https://esm.sh/@noble/hashes@1.8.0/utils";
+
+const enc = new TextEncoder(), dec = new TextDecoder();
+const $ = (id) => document.getElementById(id);
+const toHex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+// --- real GhostBox sealed box + dead-drop (same logic as src/transport.ts) ---
+const boxKey = (s) => hkdf(sha256, s, undefined, "ghostbox/v1/sealedbox", 32);
+function seal(pub, msg){
+  const e = x25519.utils.randomSecretKey(), ep = x25519.getPublicKey(e);
+  const sh = x25519.getSharedSecret(e, pub), n = randomBytes(24);
+  const ct = xchacha20poly1305(boxKey(sh), n).encrypt(msg);
+  const o = new Uint8Array(56 + ct.length); o.set(ep,0); o.set(n,32); o.set(ct,56); return o;
+}
+function unseal(priv, b){
+  const sh = x25519.getSharedSecret(priv, b.subarray(0,32));
+  return xchacha20poly1305(boxKey(sh), b.subarray(32,56)).decrypt(b.subarray(56));
+}
+function newIdentity(){
+  const xp = x25519.utils.randomSecretKey(), sp = ed25519.utils.randomSecretKey();
+  return { loc: toHex(randomBytes(16)), encPriv: xp, encPub: x25519.getPublicKey(xp),
+           sigPriv: sp, sigPub: ed25519.getPublicKey(sp) };
+}
+// the server: note the ABSENT fields — no sender log, no deposit→drain map
+const server = { store: new Map(), verifiers: new Map(), challenges: new Map() };
+function deposit(loc, ct){ const a = server.store.get(loc) ?? []; a.push(ct); server.store.set(loc, a); }
+function drain(me){
+  server.verifiers.set(me.loc, me.sigPub);
+  const n = randomBytes(32); server.challenges.set(me.loc, n);
+  const sig = ed25519.sign(n, me.sigPriv);
+  if(!ed25519.verify(sig, n, server.verifiers.get(me.loc))) throw new Error("verify failed");
+  server.challenges.delete(me.loc);
+  const a = server.store.get(me.loc) ?? []; server.store.delete(me.loc);
+  return a.map((b) => dec.decode(unseal(me.encPriv, b)));
+}
+
+let alice, bob, trueEdges = [];
+
+function shortLoc(loc){ return loc.slice(0,12) + "…"; }
+
+function renderServer(){
+  const mailboxes = {};
+  for (const [loc, list] of server.store) mailboxes[shortLoc(loc)] = list.length;
+  const state = {
+    mailboxes,
+    registeredLocators: [...server.verifiers.keys()].map(shortLoc),
+    senderRecords: [],
+    depositToDrainLinks: []
+  };
+  const j = JSON.stringify(state, null, 2)
+    .replace(/"senderRecords": \[\]/, '<span class="rd">"senderRecords": []</span>')
+    .replace(/"depositToDrainLinks": \[\]/, '<span class="rd">"depositToDrainLinks": []</span>');
+  $("serverState").innerHTML =
+    '<span class="c">// the COMPLETE server state. note what is missing.</span>\n' + j;
+}
+
+function renderTrue(){
+  if(!trueEdges.length){ $("trueGraph").innerHTML = '<span class="c">— send a message to begin —</span>'; return; }
+  $("trueGraph").innerHTML = trueEdges.map(e =>
+    `<div><span class="edge">${e.from}</span> <span class="arrow">→</span> <span class="edge">${e.to}</span> &nbsp;<span class="c">"${e.text}"</span></div>`
+  ).join("");
+}
+
+function renderInbox(which, msgs){
+  const el = $(which + "Inbox");
+  if(!msgs || !msgs.length){ el.innerHTML = '<div class="empty">inbox empty</div>'; return; }
+  el.innerHTML = msgs.map(m => `<div class="msg">${m.replace(/</g,"&lt;")}</div>`).join("");
+}
+
+function showFinding(){
+  const mb = server.store.size;
+  $("finding").style.display = "block";
+  $("finding").innerHTML =
+    `The server can see <b>${mb}</b> mailbox${mb===1?"":"es"} hold${mb===1?"s":""} traffic. ` +
+    `It cannot name a single sender. The arrows above — who sent to whom — are <b>absent from its state</b>. ` +
+    `The social graph is not in the data.`;
+  $("caveat").style.display = "block";
+  $("caveat").innerHTML =
+    "SCOPE: this demonstrates application-layer unlinkability — the protocol's data structures don't encode who-talks-to-whom. " +
+    "It does not, on its own, defeat a network-layer observer watching IP or timing; that needs Tor or a mixnet. " +
+    "The transport here uses sealed-box encryption (sender-anonymous) but not yet the Double Ratchet's forward secrecy. Honest limits, same as the spec.";
+}
+
+function send(from, to, inputId){
+  const text = $(inputId).value.trim();
+  if(!text) return;
+  deposit(to.loc, seal(to.encPub, enc.encode(text)));
+  trueEdges.push({ from: from===alice?"Alice":"Bob", to: to===alice?"Alice":"Bob", text });
+  $(inputId).value = "";
+  renderServer(); renderTrue(); showFinding();
+}
+
+$("btnInit").addEventListener("click", () => {
+  alice = newIdentity(); bob = newIdentity();
+  $("aliceId").innerHTML = `locator <b>${shortLoc(alice.loc)}</b><br><span style="color:#6f6c64">x25519 ${toHex(alice.encPub).slice(0,16)}…</span>`;
+  $("bobId").innerHTML = `locator <b>${shortLoc(bob.loc)}</b><br><span style="color:#6f6c64">x25519 ${toHex(bob.encPub).slice(0,16)}…</span>`;
+  ["aliceMsg","aliceSend","aliceDrain","bobMsg","bobSend","bobDrain","btnReset"].forEach(id => $(id).disabled = false);
+  $("btnInit").disabled = true;
+  renderServer();
+});
+$("aliceSend").addEventListener("click", () => send(alice, bob, "aliceMsg"));
+$("bobSend").addEventListener("click", () => send(bob, alice, "bobMsg"));
+$("aliceDrain").addEventListener("click", () => { renderInbox("alice", drain(alice)); renderServer(); });
+$("bobDrain").addEventListener("click", () => { renderInbox("bob", drain(bob)); renderServer(); });
+$("btnReset").addEventListener("click", () => {
+  server.store.clear(); server.verifiers.clear(); server.challenges.clear();
+  trueEdges = []; alice = bob = null;
+  ["aliceMsg","aliceSend","aliceDrain","bobMsg","bobSend","bobDrain","btnReset"].forEach(id => $(id).disabled = true);
+  $("btnInit").disabled = false;
+  $("aliceId").textContent = "— not yet generated —"; $("bobId").textContent = "— not yet generated —";
+  renderInbox("alice", []); renderInbox("bob", []);
+  $("finding").style.display = "none"; $("caveat").style.display = "none";
+  $("serverState").innerHTML = '<span class="c">// generate identities, then send a message</span>';
+  renderTrue();
+});
+// allow Enter to send
+$("aliceMsg")?.addEventListener("keydown", (e) => { if(e.key==="Enter") send(alice,bob,"aliceMsg"); });
+$("bobMsg")?.addEventListener("keydown", (e) => { if(e.key==="Enter") send(bob,alice,"bobMsg"); });
+</script>
+</body>
+</html>
