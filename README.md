@@ -8,6 +8,36 @@ This repository contains the open specification and reference implementation for
 - **The Companion Permissions Layer** — the access-control model between a user's personal data vault and the outside world, mediated by an AI companion that acts as a non-bribable gatekeeper.
 
 Both apply one design decision at two layers: **remove the intermediary's ability to extract value from your data by removing its access to that data.**
+___
+## Explain it like I'm five
+
+*New here? Start with this. The precise version lives in [SPECIFICATION.md](./SPECIFICATION.md); this is the same thing in plain words.*
+
+Picture a clubhouse with a magic wall of mailboxes, run by a grown-up who is blindfolded and has no memory. That grown-up is the middleman every app puts between you and your friends. Most apps let him read your notes and sell what he learns. This one is built so he *cannot* peek and *cannot* remember. That is the whole idea: not a promise to behave, but a room where misbehaving isn't possible.
+
+Here is what each part does.
+
+**Your secret identity** (`src/identity.ts`). You whisper a few secret words only you know, and the machine turns them into your own mailbox address plus the one key that opens it. Nobody hands it to you and nobody can take it away, because it was never stored anywhere. Lose the words, lose the mailbox. That is the trade.
+
+**The drop-off wall** (`src/transport.ts`). You leave a locked box in someone's cubby. To collect your own mail, you prove the cubby is yours with a secret handshake. The blindfolded grown-up only ever holds boxes. He never sees who dropped one or who picked one up, so he can never draw a map of who talks to whom.
+
+**The unfoolable lock** (`src/envelope.ts`). A box opens for exactly one key, and refuses to even pretend for a wrong one. No jiggling it loose.
+
+**A fresh key for every note** (`src/ratchet.ts`). Every message gets a brand-new key, and the old key is burned right after. If a thief steals today's key, yesterday's notes stay locked, because the keys that opened them no longer exist. (Grown-ups call this *forward secrecy*.)
+
+**Saving your place** (`src/statesync.ts`). It writes down, locked up tight, where you are in the key-burning sequence, so you can move from phone to laptop without losing the thread.
+
+**The nametag to Bluesky** (`src/atproto-bridge.ts`). If you *want* to be found, you pin a small note on your public Bluesky profile that says "leave my secret mail here." Handy, but it does tell the world you have a secret mailbox. So it is for people who want to be reachable, not for people who want to stay hidden.
+
+**The LEGO checklist** (`MANIFEST.json` + `verify_manifest.mjs`). A photo of every file in the box. Before building anything new, you check the photos, so you know nobody swapped a piece while you weren't looking.
+
+**The robot inspectors** (`test-vectors/` + CI). Little robots that re-run everything and squawk if a toy is broken. There are ten of them, and they all have to give a thumbs-up before anything ships.
+
+**What it does not do, said plainly:** it is not finished, and not yet checked by an outside expert; the Bluesky nametag reveals *that* you use this, just not what you say; and a thief who steals your secret words gets everything, on purpose, because there are no accounts to reset.
+
+The punchline the whole thing exists to prove: you could hand a snoop the *entire* contents of the mailroom and they still could not tell you who is friends with whom. Not because anyone promised to be good, but because there is nothing in there to find.
+
+*(There is a planned second half: a "Companion" that guards your personal data vault like a bouncer who cannot be bribed. That part is still a design on paper. This repo is mostly the messaging half so far.)*
 
 ---
 
