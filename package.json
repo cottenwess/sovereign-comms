@@ -1,6 +1,6 @@
 {
   "name": "sovereign-comms",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Reference implementation of the GhostBox Protocol and Companion Permissions Layer",
   "license": "AGPL-3.0-or-later",
   "author": "Cory A. Ottenwess",
