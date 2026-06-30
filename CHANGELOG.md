@@ -9,6 +9,21 @@ While the project is pre-1.0, the spec and reference implementation are working
 drafts: APIs, wire formats, and security properties may change between minor
 versions. Nothing here is audited or production-ready.
 
+## [0.4.1] — 2026-06-28
+
+Housekeeping release. No protocol, wire-format, or cryptographic behavior
+changed from v0.4.0, and no source-file hash changed.
+
+### Removed
+- 19 duplicate source and test files that had accumulated at the repository
+  root, shadowing their canonical homes under `src/`, `reference/`,
+  `test-vectors/`, `demo/`, and `lexicons/`. They were byte-identical to the
+  canonical files and imported by nothing (every CI job and every test resolves
+  to the subdirectory paths), so removing them changes no behavior.
+
+### Added
+- `.gitignore` (standard Node and Python ignores).
+
 ## [0.4.0] — 2026-06-11
 
 ### Added
